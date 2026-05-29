@@ -61,6 +61,7 @@ const els = {
   imageInput: document.querySelector("#imageInput"),
   paletteInput: document.querySelector("#paletteInput"),
   downloadBtn: document.querySelector("#downloadBtn"),
+  themeToggle: document.querySelector("#themeToggle"),
   resetBtn: document.querySelector("#resetBtn"),
   defaultPaletteBtn: document.querySelector("#defaultPaletteBtn"),
   widthSlider: document.querySelector("#widthSlider"),
@@ -521,9 +522,7 @@ function bestOrderedPairForLab(anchorLab, cleanMatch, profile) {
 }
 
 function ditherProfile() {
-  const ditherAmount = finiteNumber(state.dither, 0);
-
-  if (state.dither === "none" || ditherAmount <= 0) {
+  if (state.dither === "none") {
     return {
       edgeEnd: 0,
       edgeStart: 0,
@@ -563,6 +562,23 @@ function ditherProfile() {
       guard: 5.25,
       lightness: 0,
       mode: "edge",
+      needEnd: 1,
+      needStart: 1,
+    };
+  }
+
+  const ditherAmount = finiteNumber(state.dither, 0);
+
+  if (ditherAmount <= 0) {
+    return {
+      edgeEnd: 0,
+      edgeStart: 0,
+      enabled: false,
+      candidateLimit: state.paletteLab.length,
+      chroma: 0,
+      guard: 0.35,
+      lightness: 0,
+      mode: "none",
       needEnd: 1,
       needStart: 1,
     };
@@ -2510,30 +2526,7 @@ function drawCanvasResampled(bitmap, width, height, imageSmoothingEnabled) {
   return ctx.getImageData(0, 0, width, height);
 }
 
-function drawSupersampled(bitmap, width, height) {
-  const pixelCount = width * height;
-  const maxOversamplePixels = 2200000;
-  const naturalScale = Math.max(1, Math.min(bitmap.width / width, bitmap.height / height));
-  const budgetScale = Math.max(1, Math.floor(Math.sqrt(maxOversamplePixels / pixelCount)));
-  const naturalSampleScale = naturalScale < 1.45 ? 1 : Math.max(2, Math.round(naturalScale));
-  const sampleScale = Math.max(1, Math.min(8, naturalSampleScale, budgetScale));
-
-  if (sampleScale <= 1) {
-    return drawCanvasResampled(bitmap, width, height, true);
-  }
-
-  const sampleWidth = width * sampleScale;
-  const sampleHeight = height * sampleScale;
-  const sampleCanvas = document.createElement("canvas");
-  sampleCanvas.width = sampleWidth;
-  sampleCanvas.height = sampleHeight;
-  const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true, alpha: true });
-  sampleCtx.imageSmoothingEnabled = true;
-  sampleCtx.imageSmoothingQuality = "high";
-  sampleCtx.clearRect(0, 0, sampleWidth, sampleHeight);
-  sampleCtx.drawImage(bitmap, 0, 0, sampleWidth, sampleHeight);
-
-  const sample = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+function averageSampledPixels(sample, sampleWidth, width, height, sampleScale) {
   const output = new ImageData(width, height);
   const samplesPerPixel = sampleScale * sampleScale;
 
@@ -2574,9 +2567,63 @@ function drawSupersampled(bitmap, width, height) {
   return output;
 }
 
+function drawSupersampled(bitmap, width, height) {
+  const pixelCount = width * height;
+  const maxOversamplePixels = 2200000;
+  const naturalScale = Math.max(1, Math.min(bitmap.width / width, bitmap.height / height));
+  const budgetScale = Math.max(1, Math.floor(Math.sqrt(maxOversamplePixels / pixelCount)));
+  const naturalSampleScale = naturalScale < 1.45 ? 1 : Math.max(2, Math.round(naturalScale));
+  const sampleScale = Math.max(1, Math.min(8, naturalSampleScale, budgetScale));
+
+  if (sampleScale <= 1) {
+    return drawCanvasResampled(bitmap, width, height, true);
+  }
+
+  const sampleWidth = width * sampleScale;
+  const sampleHeight = height * sampleScale;
+  const sampleCanvas = document.createElement("canvas");
+  sampleCanvas.width = sampleWidth;
+  sampleCanvas.height = sampleHeight;
+  const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true, alpha: true });
+  sampleCtx.imageSmoothingEnabled = true;
+  sampleCtx.imageSmoothingQuality = "high";
+  sampleCtx.clearRect(0, 0, sampleWidth, sampleHeight);
+  sampleCtx.drawImage(bitmap, 0, 0, sampleWidth, sampleHeight);
+
+  const sample = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+  return averageSampledPixels(sample, sampleWidth, width, height, sampleScale);
+}
+
+function drawSharpSampled(bitmap, width, height) {
+  const pixelCount = width * height;
+  const maxOversamplePixels = 1800000;
+  const naturalScale = Math.max(1, Math.min(bitmap.width / width, bitmap.height / height));
+  const budgetScale = Math.max(1, Math.floor(Math.sqrt(maxOversamplePixels / pixelCount)));
+  const naturalSampleScale =
+    naturalScale < 1.18 ? 1 : Math.max(2, Math.min(6, Math.round(Math.sqrt(naturalScale) * 2)));
+  const sampleScale = Math.max(1, Math.min(6, naturalSampleScale, budgetScale));
+
+  if (sampleScale <= 1) {
+    return drawCanvasResampled(bitmap, width, height, false);
+  }
+
+  const sampleWidth = width * sampleScale;
+  const sampleHeight = height * sampleScale;
+  const sampleCanvas = document.createElement("canvas");
+  sampleCanvas.width = sampleWidth;
+  sampleCanvas.height = sampleHeight;
+  const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true, alpha: true });
+  sampleCtx.imageSmoothingEnabled = false;
+  sampleCtx.clearRect(0, 0, sampleWidth, sampleHeight);
+  sampleCtx.drawImage(bitmap, 0, 0, sampleWidth, sampleHeight);
+
+  const sample = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+  return averageSampledPixels(sample, sampleWidth, width, height, sampleScale);
+}
+
 function drawDownsampled(bitmap, width, height) {
   if (state.sampling === "crisp") {
-    return drawCanvasResampled(bitmap, width, height, false);
+    return drawSharpSampled(bitmap, width, height);
   }
 
   return drawSupersampled(bitmap, width, height);
@@ -2888,10 +2935,34 @@ function setViewMode(mode) {
   });
 }
 
+function currentTheme() {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function applyTheme(theme) {
+  const nextTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = nextTheme;
+  try {
+    localStorage.setItem("pixelizer-theme", nextTheme);
+  } catch {
+    // Theme still applies for the current session if storage is unavailable.
+  }
+  els.themeToggle.setAttribute(
+    "aria-label",
+    nextTheme === "dark" ? "Включить светлую тему" : "Включить темную тему",
+  );
+  els.themeToggle.innerHTML = `<i data-lucide="${nextTheme === "dark" ? "sun" : "moon"}" aria-hidden="true"></i>`;
+  window.lucide?.createIcons();
+}
+
 function parseDitherValue(value) {
   if (value === "none" || value === "auto" || value === "edge") return value;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? clampRange(parsed, 0, 1.2) : "auto";
+}
+
+function parseSamplingValue(value) {
+  return value === "crisp" ? "crisp" : "smooth";
 }
 
 function bindEvents() {
@@ -2922,13 +2993,17 @@ function bindEvents() {
     els.exportScale.value = String(state.exportScale);
   });
 
+  els.themeToggle.addEventListener("click", () => {
+    applyTheme(currentTheme() === "dark" ? "light" : "dark");
+  });
+
   els.keepAlpha.checked = true;
 
   document.querySelectorAll("[data-sampling]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.sampling = button.dataset.sampling;
+      state.sampling = parseSamplingValue(button.dataset.sampling);
       document.querySelectorAll("[data-sampling]").forEach((item) => {
-        item.classList.toggle("is-active", item === button);
+        item.classList.toggle("is-active", item.dataset.sampling === state.sampling);
       });
       render();
     });
@@ -2999,6 +3074,7 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
+  applyTheme(currentTheme());
   rebuildPaletteLab();
   renderPalette();
   state.sourceBitmap = await makeDemoBitmap();
