@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Palette Pixelizer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="app.js?v=20260529-stable-final" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand" aria-label="Palette Pixelizer">
+          <span class="brand-mark"></span>
+          <div>
+            <strong>Palette Pixelizer</strong>
+            <span>пиксель-арт конвертер</span>
+          </div>
+        </div>
+
+        <div class="top-actions">
+          <label class="button button-primary" for="imageInput">
+            <i data-lucide="image-up" aria-hidden="true"></i>
+            <span>Открыть</span>
+          </label>
+          <input id="imageInput" class="visually-hidden" type="file" accept="image/*">
+
+          <button id="downloadBtn" class="button" type="button">
+            <i data-lucide="download" aria-hidden="true"></i>
+            <span>PNG</span>
+          </button>
+
+          <button id="resetBtn" class="icon-button" type="button" aria-label="Сбросить">
+            <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section id="dropZone" class="stage" aria-label="Рабочая область">
+          <div class="stage-toolbar">
+            <div class="view-tabs" role="tablist" aria-label="Вид">
+              <button class="tab is-active" data-view="result" type="button">Результат</button>
+              <button class="tab" data-view="split" type="button">Сравнение</button>
+            </div>
+            <div class="meta-line" id="imageMeta">демо</div>
+          </div>
+
+          <div class="canvas-area" data-view-mode="result">
+            <div class="canvas-frame canvas-frame-main">
+              <canvas id="resultCanvas" aria-label="Пикселизированное изображение"></canvas>
+            </div>
+
+            <div class="split-grid" aria-hidden="true">
+              <div class="preview-pane">
+                <div class="pane-label">Оригинал</div>
+                <canvas id="sourceCanvas"></canvas>
+              </div>
+              <div class="preview-pane">
+                <div class="pane-label">Палитра</div>
+                <canvas id="mappedCanvas"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="control-panel" aria-label="Настройки">
+          <section class="control-section">
+            <div class="section-title">
+              <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+              <span>Пиксели</span>
+            </div>
+
+            <label class="control-row">
+              <span>Ширина</span>
+              <input id="widthSlider" type="range" min="16" max="256" step="1" value="96">
+              <output id="widthValue" for="widthSlider">96</output>
+            </label>
+
+            <label class="control-row">
+              <span>Масштаб PNG</span>
+              <select id="exportScale">
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="4" selected>4x</option>
+                <option value="8">8x</option>
+              </select>
+            </label>
+
+            <div class="control-block">
+              <span class="field-label">Сэмплинг</span>
+              <div class="segmented sampling-segmented" role="radiogroup" aria-label="Сэмплинг">
+                <button class="segment" data-sampling="crisp" type="button">Четкий</button>
+                <button class="segment is-active" data-sampling="smooth" type="button">Мягкий</button>
+              </div>
+            </div>
+
+            <div class="control-block">
+              <span class="field-label">Дизеринг</span>
+              <div class="segmented dither-segmented" role="radiogroup" aria-label="Дизеринг">
+                <button class="segment" data-dither="none" type="button">Нет</button>
+                <button class="segment is-active" data-dither="auto" type="button">Авто</button>
+                <button class="segment" data-dither="edge" type="button">Края</button>
+                <button class="segment" data-dither="0.45" type="button">Легкий</button>
+                <button class="segment" data-dither="0.85" type="button">Floyd</button>
+              </div>
+            </div>
+
+            <label class="toggle-row">
+              <input id="keepAlpha" type="checkbox" checked disabled>
+              <span>100% opacity</span>
+            </label>
+          </section>
+
+          <section class="control-section">
+            <div class="section-title">
+              <i data-lucide="swatch-book" aria-hidden="true"></i>
+              <span>Палитра</span>
+            </div>
+
+            <div id="paletteGrid" class="palette-grid" aria-label="Цвета палитры"></div>
+
+            <div class="palette-actions">
+              <label class="button button-compact" for="paletteInput">
+                <i data-lucide="palette" aria-hidden="true"></i>
+                <span>Импорт</span>
+              </label>
+              <input id="paletteInput" class="visually-hidden" type="file" accept="image/*">
+              <button id="defaultPaletteBtn" class="button button-compact" type="button">
+                <i data-lucide="undo-2" aria-hidden="true"></i>
+                <span>Стартовая</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="control-section compact-stats">
+            <div>
+              <span class="stat-label">Размер</span>
+              <strong id="pixelSizeStat">96 x 96</strong>
+            </div>
+            <div>
+              <span class="stat-label">Цветов</span>
+              <strong id="colorCountStat">0</strong>
+            </div>
+          </section>
+        </aside>
+      </main>
+    </div>
+  </body>
+</html>
